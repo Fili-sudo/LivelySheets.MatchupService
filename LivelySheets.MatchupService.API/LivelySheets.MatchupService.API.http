@@ -1,0 +1,6 @@
+@LivelySheets.MatchupService.API_HostAddress = http://localhost:5245
+
+GET {{LivelySheets.MatchupService.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
