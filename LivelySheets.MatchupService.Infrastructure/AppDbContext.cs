@@ -1,15 +1,19 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using LivelySheets.MatchupService.Domain.Entities.Messages;
 
 namespace LivelySheets.MatchupService.Infrastructure;
 
 public class AppDbContext : DbContext
 {
+    public DbSet<InboxMessage> OutboxMessages { get; set; }
     public AppDbContext(DbContextOptions options) : base(options)
     {
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<InboxMessage>()
+            .Property(m => m.UpdatedOn)
+            .IsRequired(false);
     }
 }

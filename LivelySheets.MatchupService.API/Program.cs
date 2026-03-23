@@ -1,6 +1,9 @@
+using LivelySheets.MatchupService.API.Constants;
 using LivelySheets.MatchupService.API.Extensions;
+using LivelySheets.MatchupService.Application.Interfaces;
 using LivelySheets.MatchupService.Application.Utils;
 using LivelySheets.MatchupService.Infrastructure;
+using LivelySheets.MatchupService.Infrastructure.DataAccess;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
@@ -17,6 +20,18 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
         opt.UseSqlServer(config.GetConnectionString("CString")));
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Helper.AssemblyReference));
 
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: CorsPolicyNames.CatalogServiceCorsPolicy,
+                      policy =>
+                      {
+                          policy.WithOrigins(config[CorsOrigins.CatalogServiceCorsOriginsConfiguration] ?? "")
+                                .AllowAnyHeader()
+                                .AllowAnyMethod();
+                      });
+});
+
 
 var app = builder.Build();
 
@@ -28,6 +43,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors(CorsPolicyNames.CatalogServiceCorsPolicy);
 
 app.MapEndpoints();
 app.Run();
