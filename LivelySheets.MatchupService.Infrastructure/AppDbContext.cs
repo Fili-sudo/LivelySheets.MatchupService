@@ -5,7 +5,7 @@ namespace LivelySheets.MatchupService.Infrastructure;
 
 public class AppDbContext : DbContext
 {
-    public DbSet<InboxMessage> OutboxMessages { get; set; }
+    public DbSet<InboxMessage> InboxMessages { get; set; }
     public AppDbContext(DbContextOptions options) : base(options)
     {
     }

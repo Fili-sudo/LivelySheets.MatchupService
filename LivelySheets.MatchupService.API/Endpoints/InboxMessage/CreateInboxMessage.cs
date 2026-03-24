@@ -1,4 +1,6 @@
-﻿using MediatR;
+﻿using LivelySheets.MatchupService.API.Contracts.Requests;
+using LivelySheets.MatchupService.Application.Commands;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LivelySheets.MatchupService.API.Endpoints.InboxMessage
@@ -10,9 +12,16 @@ namespace LivelySheets.MatchupService.API.Endpoints.InboxMessage
         {
             app.MapPost("messages/create-message", async (HttpContext context,
                 LinkGenerator linkGenerator,
+                [FromBody] PostCreateInboxMessageDto body,
                 [FromServices] IMediator mediator) =>
             {
-                return Results.NoContent();
+                var result = await mediator.Send((CreateInboxMessageCommand)body);
+                var messageLink = linkGenerator.GetUriByName(
+                        context, GetInboxMessage.GetInboxMessageEndpoint,
+                        new { messageId = result }
+                    );
+
+                return Results.Created(messageLink, result);
             })
             .WithName(CreateInboxMessageEndpoint);
         }
