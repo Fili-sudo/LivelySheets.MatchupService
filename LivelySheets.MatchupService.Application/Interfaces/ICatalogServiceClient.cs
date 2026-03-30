@@ -2,4 +2,5 @@
 
 public interface ICatalogServiceClient
 {
+    Task<HttpResponseMessage> DeleteOutboxMessageAsync(Guid messageId);
 }
