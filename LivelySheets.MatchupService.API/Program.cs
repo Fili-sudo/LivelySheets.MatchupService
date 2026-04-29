@@ -1,3 +1,4 @@
+using LivelySheets.MatchupService.API.Background_Services;
 using LivelySheets.MatchupService.API.Constants;
 using LivelySheets.MatchupService.API.Extensions;
 using LivelySheets.MatchupService.API.HttpClients;
@@ -38,6 +39,7 @@ builder.Services.AddHttpClient<ICatalogServiceClient, CatalogServiceClient>(http
     httpClient.BaseAddress = new Uri(config[Services.CatalogServiceConfiguration] ?? "");
 });
 
+builder.Services.AddHostedService<MessageConsumerService>();
 
 var app = builder.Build();
 
