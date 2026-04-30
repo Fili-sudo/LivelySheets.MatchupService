@@ -15,7 +15,12 @@ public class MessageConsumerService : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             _logger.LogInformation($"MessageConsumerService started at {DateTimeOffset.Now}");
-            using var timer = new Timer(CallbackAction, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+            //using var timer = new Timer(CallbackAction, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+            var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+            while (await periodicTimer.WaitForNextTickAsync(stoppingToken))
+            {
+                await CallbackActionAsync(CancellationToken.None);
+            }
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
     }
@@ -24,5 +29,12 @@ public class MessageConsumerService : BackgroundService
     {
         var currentTme = DateTime.Now;
         _logger.LogInformation($"Message consumed at {currentTme}");
+    }
+
+    async Task CallbackActionAsync(CancellationToken cancellationToken = default)
+    {
+        var currentTme = DateTime.Now;
+        _logger.LogInformation($"Message consumed at {currentTme}");
+        await Task.CompletedTask;
     }
 }
