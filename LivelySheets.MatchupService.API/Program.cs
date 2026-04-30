@@ -6,6 +6,7 @@ using LivelySheets.MatchupService.Application.Interfaces;
 using LivelySheets.MatchupService.Application.Utils;
 using LivelySheets.MatchupService.Infrastructure;
 using LivelySheets.MatchupService.Infrastructure.DataAccess;
+using LivelySheets.MatchupService.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
@@ -40,6 +41,7 @@ builder.Services.AddHttpClient<ICatalogServiceClient, CatalogServiceClient>(http
 });
 
 builder.Services.AddHostedService<MessageConsumerService>();
+builder.Services.AddSingleton<RabbitMqContextFactory>();
 
 var app = builder.Build();
 

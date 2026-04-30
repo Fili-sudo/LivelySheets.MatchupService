@@ -1,4 +1,5 @@
 ﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 
 namespace LivelySheets.MatchupService.Infrastructure.Messaging;
 
@@ -20,9 +21,25 @@ public class RabbitMqContext : IAsyncDisposable
         if (isSetup)
             return;
 
-        Connection = await _factory.CreateConnectionAsync();
-        Channel = await Connection!.CreateChannelAsync();
+        Connection = await _factory.CreateConnectionAsync(cancellationToken);
+        Channel = await Connection!.CreateChannelAsync(cancellationToken: cancellationToken);
         isSetup = true;
+    }
+
+    public async Task<(AsyncEventingBasicConsumer Consumer, string QueueName)> SetupTopicConsumer(string exchange, string routingKey, CancellationToken cancellationToken = default)
+    {
+        if (!isSetup)
+            throw new InvalidOperationException($"Cannot Invoke this method without a prior setup. {nameof(isSetup)}: {isSetup}");
+
+        await Channel!.ExchangeDeclareAsync(exchange: exchange, type: ExchangeType.Topic, cancellationToken: cancellationToken);
+        QueueDeclareOk queueDeclareResult = await Channel!.QueueDeclareAsync(cancellationToken: cancellationToken);
+        await Channel!.QueueBindAsync(
+            queue: queueDeclareResult.QueueName,
+            exchange: exchange,
+            routingKey: routingKey,
+            cancellationToken: cancellationToken);
+
+        return (new AsyncEventingBasicConsumer(Channel), queueDeclareResult.QueueName);
     }
 
     public async ValueTask DisposeAsync()
