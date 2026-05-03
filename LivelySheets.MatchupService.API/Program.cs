@@ -2,7 +2,6 @@ using LivelySheets.MatchupService.API.Background_Services;
 using LivelySheets.MatchupService.API.Constants;
 using LivelySheets.MatchupService.API.Consumers;
 using LivelySheets.MatchupService.API.Extensions;
-using LivelySheets.MatchupService.API.HttpClients;
 using LivelySheets.MatchupService.Application.Interfaces;
 using LivelySheets.MatchupService.Application.Utils;
 using LivelySheets.MatchupService.Infrastructure;
@@ -36,10 +35,6 @@ builder.Services.AddCors(options =>
                       });
 });
 
-builder.Services.AddHttpClient<ICatalogServiceClient, CatalogServiceClient>(httpClient =>
-{
-    httpClient.BaseAddress = new Uri(config[Services.CatalogServiceConfiguration] ?? "");
-});
 builder.Services.AddHttpClient(
     NamedHttpClients.CatalogServiceNamedHttpClient,
     client =>

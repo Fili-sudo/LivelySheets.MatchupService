@@ -1,7 +1,9 @@
 ﻿
+using LivelySheets.MatchupService.API.Constants;
 using LivelySheets.MatchupService.API.Consumers;
 using LivelySheets.MatchupService.Domain.Entities.Messages;
 using System.Collections.Concurrent;
+using System.Net;
 
 namespace LivelySheets.MatchupService.API.Background_Services;
 
@@ -40,7 +42,6 @@ public class MessageConsumerService : BackgroundService
 
     }
 
-
     async Task ProcessMessagesAsync(ConcurrentQueue<OutboxMessage> internalMessageQueue, int periodInSeconds = 5, CancellationToken cancellationToken = default)
     {
         var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(periodInSeconds));
@@ -52,19 +53,22 @@ public class MessageConsumerService : BackgroundService
                 .Select(async t =>
                     {
                         if (internalMessageQueue.TryDequeue(out var outboxMessage))
-                            await CallbackActionAsync(outboxMessage, cancellationToken);
+                            return await CallbackActionAsync(outboxMessage, cancellationToken);
 
-                        return Task.CompletedTask;
+                        return HttpStatusCode.Conflict;
                     }));
         }
 
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
-    //TODO: call with the outboxMessageId to the CatalogService API. Use the _httpClientFactory injected above
-    async Task CallbackActionAsync(OutboxMessage outboxMessage, CancellationToken cancellationToken = default)
+    async Task<HttpStatusCode> CallbackActionAsync(OutboxMessage outboxMessage, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation($"OutboxMessage:{outboxMessage.Id} started processing at {DateTimeOffset.Now}");
+        HttpClient httpClient = _httpClientFactory.CreateClient(NamedHttpClients.CatalogServiceNamedHttpClient ?? "");
+        var response = await httpClient.DeleteAsync($"{NamedHttpClients.CatalogServiceEndpoints.DeleteOutboxMessageEndpoint}/{outboxMessage.Id}", cancellationToken);
         _logger.LogInformation($"OutboxMessage:{outboxMessage.Id} processed at {DateTimeOffset.Now}");
-        await Task.CompletedTask;
+
+        return response.StatusCode;
     }
 }
