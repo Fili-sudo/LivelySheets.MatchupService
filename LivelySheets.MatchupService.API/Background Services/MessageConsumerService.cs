@@ -1,40 +1,70 @@
 ﻿
+using LivelySheets.MatchupService.API.Consumers;
+using LivelySheets.MatchupService.Domain.Entities.Messages;
+using System.Collections.Concurrent;
+
 namespace LivelySheets.MatchupService.API.Background_Services;
 
 public class MessageConsumerService : BackgroundService
 {
     private readonly ILogger<MessageConsumerService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly FindBattleMessageConsumer _consumer;
+    private readonly ConcurrentQueue<OutboxMessage> internalMessageQueue;
 
-    public MessageConsumerService(ILogger<MessageConsumerService> logger)
+    public MessageConsumerService(ILogger<MessageConsumerService> logger,
+        IHttpClientFactory httpClientFactory,
+        FindBattleMessageConsumer consumer)
     {
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
+        _consumer = consumer;
+        internalMessageQueue = new();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            _logger.LogInformation($"MessageConsumerService started at {DateTimeOffset.Now}");
-            //using var timer = new Timer(CallbackAction, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
-            var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(5));
-            while (await periodicTimer.WaitForNextTickAsync(stoppingToken))
-            {
-                await CallbackActionAsync(CancellationToken.None);
-            }
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            _logger.LogInformation($"{nameof(MessageConsumerService)} started at {DateTimeOffset.Now}");
+            Task consumeTask = _consumer.StartConsumingAsync(internalMessageQueue, stoppingToken);
+            Task periodicTask = ProcessMessagesAsync(internalMessageQueue, periodInSeconds: 5, cancellationToken: stoppingToken);
+
+            await Task.WhenAll(periodicTask, consumeTask);
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"{nameof(MessageConsumerService)} crushed unexpectedly at {DateTimeOffset.Now}. Retrying...");
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
+
     }
 
-    void CallbackAction(object? state)
+
+    async Task ProcessMessagesAsync(ConcurrentQueue<OutboxMessage> internalMessageQueue, int periodInSeconds = 5, CancellationToken cancellationToken = default)
     {
-        var currentTme = DateTime.Now;
-        _logger.LogInformation($"Message consumed at {currentTme}");
+        var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(periodInSeconds));
+        while (await periodicTimer.WaitForNextTickAsync(cancellationToken))
+        {
+            _logger.LogInformation($"{DateTimeOffset.Now}: Looking for messages to process...");
+            var concurrentTaskCount = internalMessageQueue.Count > 3 ? 3 : internalMessageQueue.Count;
+            await Task.WhenAll(Enumerable.Range(0, concurrentTaskCount)
+                .Select(async t =>
+                    {
+                        if (internalMessageQueue.TryDequeue(out var outboxMessage))
+                            await CallbackActionAsync(outboxMessage, cancellationToken);
+
+                        return Task.CompletedTask;
+                    }));
+        }
+
+        await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
-    async Task CallbackActionAsync(CancellationToken cancellationToken = default)
+    //TODO: call with the outboxMessageId to the CatalogService API. Use the _httpClientFactory injected above
+    async Task CallbackActionAsync(OutboxMessage outboxMessage, CancellationToken cancellationToken = default)
     {
-        var currentTme = DateTime.Now;
-        _logger.LogInformation($"Message consumed at {currentTme}");
+        _logger.LogInformation($"OutboxMessage:{outboxMessage.Id} processed at {DateTimeOffset.Now}");
         await Task.CompletedTask;
     }
 }
