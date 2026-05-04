@@ -36,7 +36,7 @@ public class MessageConsumerService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"{nameof(MessageConsumerService)} crushed unexpectedly at {DateTimeOffset.Now}. Retrying...");
+            _logger.LogError(ex, $"{nameof(MessageConsumerService)} crashed unexpectedly at {DateTimeOffset.Now}. Retrying...");
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
 
@@ -62,6 +62,8 @@ public class MessageConsumerService : BackgroundService
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
+    //TODO: implement fail-safe mechanism using Result pattern as this method gets called on a concurrent task manner and
+    // failling here or anywhere without throwing the error upwards blocks the background service
     async Task<HttpStatusCode> CallbackActionAsync(OutboxMessage outboxMessage, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation($"OutboxMessage:{outboxMessage.Id} started processing at {DateTimeOffset.Now}");
