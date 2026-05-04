@@ -1,6 +1,7 @@
 ﻿
 using LivelySheets.MatchupService.API.Constants;
 using LivelySheets.MatchupService.API.Consumers;
+using LivelySheets.MatchupService.Application.Generics;
 using LivelySheets.MatchupService.Domain.Entities.Messages;
 using System.Collections.Concurrent;
 using System.Net;
@@ -28,7 +29,7 @@ public class MessageConsumerService : BackgroundService
     {
         try
         {
-            _logger.LogInformation($"{nameof(MessageConsumerService)} started at {DateTimeOffset.Now}");
+            _logger.LogInformation(LoggingMessages.BackgroundServiceUnhandledErrorMessage, nameof(MessageConsumerService), DateTimeOffset.Now);
             Task consumeTask = _consumer.StartConsumingAsync(internalMessageQueue, stoppingToken);
             Task periodicTask = ProcessMessagesAsync(internalMessageQueue, periodInSeconds: 5, cancellationToken: stoppingToken);
 
@@ -36,7 +37,7 @@ public class MessageConsumerService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"{nameof(MessageConsumerService)} crashed unexpectedly at {DateTimeOffset.Now}. Retrying...");
+            _logger.LogError(LoggingMessages.BackgroundServiceUnhandledErrorMessage, nameof(MessageConsumerService), DateTimeOffset.Now);
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         }
 
@@ -47,7 +48,7 @@ public class MessageConsumerService : BackgroundService
         var periodicTimer = new PeriodicTimer(TimeSpan.FromSeconds(periodInSeconds));
         while (await periodicTimer.WaitForNextTickAsync(cancellationToken))
         {
-            _logger.LogInformation($"{DateTimeOffset.Now}: Looking for messages to process...");
+            _logger.LogInformation(LoggingMessages.PeriodicTaskTicked, DateTimeOffset.Now);
             var concurrentTaskCount = internalMessageQueue.Count > 3 ? 3 : internalMessageQueue.Count;
             await Task.WhenAll(Enumerable.Range(0, concurrentTaskCount)
                 .Select(async t =>
@@ -55,22 +56,31 @@ public class MessageConsumerService : BackgroundService
                         if (internalMessageQueue.TryDequeue(out var outboxMessage))
                             return await CallbackActionAsync(outboxMessage, cancellationToken);
 
-                        return HttpStatusCode.Conflict;
+                        return Result<HttpStatusCode>.Failure([LoggingMessages.DequeueErrorMessage]);
                     }));
         }
 
         await Task.Delay(Timeout.Infinite, cancellationToken);
     }
 
-    //TODO: implement fail-safe mechanism using Result pattern as this method gets called on a concurrent task manner and
-    // failling here or anywhere without throwing the error upwards blocks the background service
-    async Task<HttpStatusCode> CallbackActionAsync(OutboxMessage outboxMessage, CancellationToken cancellationToken = default)
+    async Task<Result<HttpStatusCode>> CallbackActionAsync(OutboxMessage outboxMessage, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation($"OutboxMessage:{outboxMessage.Id} started processing at {DateTimeOffset.Now}");
-        HttpClient httpClient = _httpClientFactory.CreateClient(NamedHttpClients.CatalogServiceNamedHttpClient ?? "");
-        var response = await httpClient.DeleteAsync($"{NamedHttpClients.CatalogServiceEndpoints.DeleteOutboxMessageEndpoint}/{outboxMessage.Id}", cancellationToken);
-        _logger.LogInformation($"OutboxMessage:{outboxMessage.Id} processed at {DateTimeOffset.Now}");
+        _logger.LogInformation(LoggingMessages.StartProcessMessage, outboxMessage.Id, DateTimeOffset.Now);
+        try
+        {
+            HttpClient httpClient = _httpClientFactory.CreateClient(NamedHttpClients.CatalogServiceNamedHttpClient ?? "");
+            var response = await httpClient.DeleteAsync($"{NamedHttpClients.CatalogServiceEndpoints.DeleteOutboxMessageEndpoint}/{outboxMessage.Id}", cancellationToken);
+            _logger.LogInformation(LoggingMessages.FinishProcessMessage, outboxMessage.Id, DateTimeOffset.Now);
 
-        return response.StatusCode;
+            if (response.IsSuccessStatusCode)
+                return response.StatusCode;
+
+            return new List<string>() { response.ReasonPhrase! };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, ex.Message);
+            return ex;
+        }
     }
 }
