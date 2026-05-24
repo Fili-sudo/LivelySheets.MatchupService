@@ -1,4 +1,5 @@
-﻿using LivelySheets.MatchupService.Domain.Entities.Messages;
+﻿using LivelySheets.MatchupService.API.Background_Services;
+using LivelySheets.MatchupService.Domain.Entities.Messages;
 using LivelySheets.MatchupService.Infrastructure.Messaging;
 using LivelySheets.MatchupService.Infrastructure.Messaging.Constants;
 using RabbitMQ.Client;
@@ -10,34 +11,47 @@ namespace LivelySheets.MatchupService.API.Consumers;
 
 public class FindBattleMessageConsumer
 {
-    private readonly RabbitMqContextFactory rabbitMqContextFactory;
+    private readonly RabbitMqContextFactory _rabbitMqContextFactory;
+    private readonly ILogger<FindBattleMessageConsumer> _logger;
 
-    public FindBattleMessageConsumer(RabbitMqContextFactory rabbitMqContextFactory)
+    public FindBattleMessageConsumer(RabbitMqContextFactory rabbitMqContextFactory, ILogger<FindBattleMessageConsumer> logger)
     {
-        this.rabbitMqContextFactory = rabbitMqContextFactory;
+        _rabbitMqContextFactory = rabbitMqContextFactory;
+        _logger = logger;
     }
 
     public async Task StartConsumingAsync(ConcurrentQueue<OutboxMessage> internalMessageQueue, CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await using var rabbitMqContext = await rabbitMqContextFactory.GenerateContext(stoppingToken);
-            var (consumer, queueName) = await rabbitMqContext.SetupTopicConsumer(exchange: "topic_logs", routingKey: TopicRoutingKey.FindBattleRoutingKey, stoppingToken);
-
-            consumer.ReceivedAsync += (model, ea) =>
+            _logger.LogInformation(LoggingMessages.ConsumerTaskStarted, nameof(FindBattleMessageConsumer), DateTimeOffset.Now);
+            try
             {
-                var body = ea.Body.ToArray();
-                var message = Encoding.UTF8.GetString(body);
-                var routingKey = ea.RoutingKey;
-                var outboxMessage = JsonSerializer.Deserialize<OutboxMessage>(message);
-                internalMessageQueue.Enqueue(outboxMessage);
-                Console.WriteLine($" [x] Received '{routingKey}':'{message}'");
-                return Task.CompletedTask;
-            };
+                await using var rabbitMqContext = await _rabbitMqContextFactory.GenerateContext(stoppingToken);
+                var (consumer, queueName) = await rabbitMqContext.SetupTopicConsumer(exchange: "topic_logs", routingKey: TopicRoutingKey.FindBattleRoutingKey, stoppingToken);
+                _logger.LogInformation(LoggingMessages.TopicConsumerSetupCompleted, nameof(FindBattleMessageConsumer), DateTimeOffset.Now);
 
-            await rabbitMqContext.Channel!.BasicConsumeAsync(queueName, autoAck: true, consumer: consumer, cancellationToken: stoppingToken);
+                consumer.ReceivedAsync += (model, ea) =>
+                {
+                    var body = ea.Body.ToArray();
+                    var message = Encoding.UTF8.GetString(body);
+                    var routingKey = ea.RoutingKey;
+                    var outboxMessage = JsonSerializer.Deserialize<OutboxMessage>(message);
+                    internalMessageQueue.Enqueue(outboxMessage);
+                    Console.WriteLine($" [x] Received '{routingKey}':'{message}'");
+                    return Task.CompletedTask;
+                };
 
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+                await rabbitMqContext.Channel!.BasicConsumeAsync(queueName, autoAck: true, consumer: consumer, cancellationToken: stoppingToken);
+
+                await Task.Delay(Timeout.Infinite, stoppingToken);
+            }
+            catch (Exception ex) 
+            {
+                _logger.LogError(LoggingMessages.FindBattleMessageConsumerUnhandledErrorMessage, nameof(FindBattleMessageConsumer), DateTimeOffset.Now, ex.Message);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+            
         }
     }
 }

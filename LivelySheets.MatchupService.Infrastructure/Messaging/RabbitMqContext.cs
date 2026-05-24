@@ -6,14 +6,14 @@ namespace LivelySheets.MatchupService.Infrastructure.Messaging;
 public class RabbitMqContext : IAsyncDisposable
 {
     private readonly ConnectionFactory _factory;
-
+    private const string _hostName = "rabbitmq";
     public IConnection? Connection { get; private set; }
     public IChannel? Channel { get; private set; }
     private bool isSetup;
 
     public RabbitMqContext()
     {
-        _factory = new ConnectionFactory { HostName = "localhost" };
+        _factory = new ConnectionFactory { HostName = _hostName };
     }
 
     public async Task SetupAsync(CancellationToken cancellationToken = default)

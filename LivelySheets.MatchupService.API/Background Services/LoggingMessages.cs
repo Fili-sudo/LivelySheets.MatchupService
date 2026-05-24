@@ -4,7 +4,10 @@ public static class LoggingMessages
 {
     public static readonly string BackgroundServiceStarted = "{0} started at {1}";
     public static readonly string BackgroundServiceUnhandledErrorMessage = "{0} crashed unexpectedly at {1}. Retrying...";
+    public static readonly string FindBattleMessageConsumerUnhandledErrorMessage = "{0} crashed unexpectedly at {1} with error:{2}. Retrying...";
     public static readonly string PeriodicTaskTicked = "{0}: Looking for messages to process...";
+    public static readonly string ConsumerTaskStarted = "{0}: Consumer started at {1}";
+    public static readonly string TopicConsumerSetupCompleted = "{0}: Topic consumer finished setup at {1}";
     public static readonly string DequeueErrorMessage = "Dequeue couldn't be performed";
     public static readonly string StartProcessMessage = "OutboxMessage:{0} started processing at {1}";
     public static readonly string FinishProcessMessage = "OutboxMessage:{0} processed at {1}";

@@ -29,7 +29,7 @@ public class MessageConsumerService : BackgroundService
     {
         try
         {
-            _logger.LogInformation(LoggingMessages.BackgroundServiceUnhandledErrorMessage, nameof(MessageConsumerService), DateTimeOffset.Now);
+            _logger.LogInformation(LoggingMessages.BackgroundServiceStarted, nameof(MessageConsumerService), DateTimeOffset.Now);
             Task consumeTask = _consumer.StartConsumingAsync(internalMessageQueue, stoppingToken);
             Task periodicTask = ProcessMessagesAsync(internalMessageQueue, periodInSeconds: 5, cancellationToken: stoppingToken);
 
